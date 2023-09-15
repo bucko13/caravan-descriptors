@@ -4,12 +4,17 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:watch": "jest --watchAll",
+    "build": "tsc"
   },
   "keywords": [],
-  "author": "",
+  "author": "Buck Perley",
   "license": "ISC",
+  "type": "module",
   "devDependencies": {
+    "@jest/globals": "^29.7.0",
+    "@jest/transform": "^29.7.0",
     "@types/jest": "^29.5.4",
     "@typescript-eslint/eslint-plugin": "^6.7.0",
     "@typescript-eslint/parser": "^6.7.0",

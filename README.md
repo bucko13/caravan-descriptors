@@ -10,3 +10,11 @@ and a caravan compatible wallet configuration.
 3. npm install in the main directory
 4. cd to the caravan-rs directory and `wasm-pack build` to build the `pkg/` directory
    1. You might need to install llvm/clang
+   2. Will also need to setup paths to build libsecp
+  ```
+export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
+# for older homebrew installs
+# export PATH="/usr/local/opt/llvm/bin:$PATH"
+export CC=/opt/homebrew/opt/llvm/bin/clang
+export AR=/opt/homebrew/opt/llvm/bin/llvm-ar
+  ```
