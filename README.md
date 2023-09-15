@@ -8,7 +8,7 @@ and a caravan compatible wallet configuration.
 1. clone
 2. install [rust toolchain](https://www.rust-lang.org/tools/install) and `cargo install wasm-pack`
 3. npm install in the main directory
-4. cd to the caravan-rs directory and `wasm-pack build` to build the `pkg/` directory
+4. cd to the caravan-rs directory and `wasm-pack build -t nodejs` to build the `pkg/` directory (not clear yet if nodejs is the right target or how to make it more flexible)
    1. You might need to install llvm/clang
    2. Will also need to setup paths to build libsecp
   ```
