@@ -458,6 +458,122 @@ impl FromStr for CaravanConfig {
     }
 }
 
+/// Begin MultisigWalletConfig
+
+/// Structure that contains a deserialized config for a multisig wallet.
+///
+/// For a usage example see [this module](crate::config)'s documentation.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MultisigWalletConfig {
+    /// Address type,
+    pub address_type: CaravanAddressType,
+    /// required number of signers
+    #[serde(rename = "requiredSigners")]
+    pub required_signers: usize,
+    /// Extended public keys
+    pub key_origins: Vec<KeyOrigin>,
+    /// Caravan network
+    network: CaravanNetwork,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct KeyOrigin {
+    #[serde(rename = "bip32Path")]
+    bip32_path: Option<DerivationPath>,
+    xpub: ExtendedPubKey,
+    xfp: Option<Fingerprint>,
+}
+
+impl ToString for MultisigWalletConfig {
+    fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
+}
+
+impl FromStr for MultisigWalletConfig {
+    type Err = serde_json::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_json::from_str(s)
+    }
+}
+
+impl MultisigWalletConfig {
+    /// Get the bitcoin network value
+    pub fn network(&self) -> Network {
+        match self.network {
+            CaravanNetwork::Mainnet => Network::Bitcoin,
+            CaravanNetwork::Testnet => Network::Testnet,
+        }
+    }
+
+    /// Get the descriptor value
+    pub fn descriptor(&self, keychain: KeychainKind) -> Result<ExtendedDescriptor, Error> {
+        let required = self.required_signers;
+        let network: Network = self.network();
+
+        let result = match self.address_type {
+            CaravanAddressType::P2sh => {
+                let keys: Vec<DescriptorKey<Legacy>> = self.descriptor_keys(keychain)?;
+                descriptor! { sh ( sortedmulti_vec(required, keys) ) }
+            }
+            CaravanAddressType::P2shP2wsh => {
+                let keys: Vec<DescriptorKey<Segwitv0>> = self.descriptor_keys(keychain)?;
+                descriptor! { sh ( wsh ( sortedmulti_vec(required, keys) ) ) }
+            }
+            CaravanAddressType::P2wsh => {
+                let keys: Vec<DescriptorKey<Segwitv0>> = self.descriptor_keys(keychain)?;
+                descriptor! { wsh ( sortedmulti_vec(required, keys) ) }
+            }
+        }
+        .map_err(Error::Descriptor);
+
+        match result {
+            Ok((d, _, n)) => {
+                if n.contains(&network) {
+                    Ok(d)
+                } else {
+                    Err(Error::InvalidNetwork {
+                        requested: network,
+                        found: *n.iter().last().expect("network"),
+                    })
+                }
+            }
+            Err(e) => Err(e),
+      }
+    }
+
+    fn descriptor_keys<Ctx: ScriptContext>(
+        &self,
+        keychain: KeychainKind,
+    ) -> Result<Vec<DescriptorKey<Ctx>>, DescriptorError> {
+        let result = self
+            .key_origins
+            .iter()
+            .map(|k| {
+                let fingerprint = k.xfp;
+                let key_path = k.bip32_path.clone();
+                let key_source = fingerprint.zip(key_path);
+                let keychain_index = keychain as u32;
+                let derivation_path = DerivationPath::master().child(ChildNumber::Normal {
+                    index: keychain_index,
+                });
+                k.xpub
+                    .into_descriptor_key(key_source, derivation_path)
+                    .map_err(DescriptorError::Key)
+            })
+            .collect();
+        result
+    }
+
+    pub fn to_string_pretty(&self) -> String {
+        serde_json::to_string_pretty(self).unwrap()
+    }
+}
+
+/// END MultisigWalletConfig
+
 #[cfg(test)]
 mod test {
     use std::convert::TryFrom;
@@ -518,6 +634,51 @@ mod test {
         let expected_export: Value =
             serde_json::from_str(expected_config_json).expect("expected export");
         assert_json_include!(actual: config, expected: expected_export);
+    }
+
+    fn test_wallet_config(config_json: &str, expected_descriptors: Vec<&str>) {
+        let config = MultisigWalletConfig::from_str(config_json).expect("import from json failed");
+        let external_descriptor = config
+            .descriptor(KeychainKind::External)
+            .expect("external descriptor");
+        println!("Exported external descriptor: {}", external_descriptor);
+        let internal_descriptor = config
+            .descriptor(KeychainKind::Internal)
+            .expect("internal descriptor");
+        println!("Exported internal descriptor: {}", internal_descriptor);
+        let expected_external = ExtendedDescriptor::from_str(expected_descriptors[0]).expect("external descriptor");
+        assert_eq!(external_descriptor, expected_external);
+        let expected_internal = ExtendedDescriptor::from_str(expected_descriptors[1]).expect("internal descriptor");
+        assert_eq!(internal_descriptor, expected_internal);
+    }
+
+    #[test]
+    fn test_wallet_config_p2sh_m() {
+        let config_json = r#"{
+          "addressType": "P2SH",
+          "network": "mainnet",
+          "requiredSigners": 2,
+          "keyOrigins": [
+            {
+                "bip32Path": "m/45'/0'/100'",
+                "xpub": "xpub6CCHViYn5VzPfSR7baop9FtGcbm3UnqHwa54Z2eNvJnRFCJCdo9HtCYoLJKZCoATMLUowDDA1BMGfQGauY3fDYU3HyMzX4NDkoLYCSkLpbH",
+                "xfp" : "f57ec65d"
+              },
+            {
+                "bip32Path": "m/45'/0'/100'",
+                "xpub": "xpub6Ca5CwTgRASgkXbXE5TeddTP9mPCbYHreCpmGt9dhz9y6femstHGCoFESHHKKRcm414xMKnuLjP9LDS7TwaJC9n5gxua6XB1rwPcC6hqDub",
+                "xfp" : "efa5d916"
+              }
+          ]
+        }"#;
+
+        test_wallet_config(
+            config_json,
+            vec![
+                "sh(sortedmulti(2,[f57ec65d/45'/0'/100']xpub6CCHViYn5VzPfSR7baop9FtGcbm3UnqHwa54Z2eNvJnRFCJCdo9HtCYoLJKZCoATMLUowDDA1BMGfQGauY3fDYU3HyMzX4NDkoLYCSkLpbH/0/*,[efa5d916/45'/0'/100']xpub6Ca5CwTgRASgkXbXE5TeddTP9mPCbYHreCpmGt9dhz9y6femstHGCoFESHHKKRcm414xMKnuLjP9LDS7TwaJC9n5gxua6XB1rwPcC6hqDub/0/*))#uxj9xxul",
+                "sh(sortedmulti(2,[f57ec65d/45'/0'/100']xpub6CCHViYn5VzPfSR7baop9FtGcbm3UnqHwa54Z2eNvJnRFCJCdo9HtCYoLJKZCoATMLUowDDA1BMGfQGauY3fDYU3HyMzX4NDkoLYCSkLpbH/1/*,[efa5d916/45'/0'/100']xpub6Ca5CwTgRASgkXbXE5TeddTP9mPCbYHreCpmGt9dhz9y6femstHGCoFESHHKKRcm414xMKnuLjP9LDS7TwaJC9n5gxua6XB1rwPcC6hqDub/1/*))#3hxf9z66",
+            ],
+        );
     }
 
     #[test]

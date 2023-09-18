@@ -49,6 +49,52 @@ impl ExtendedDescriptor {
 
 #[derive(Debug)]
 #[wasm_bindgen]
+pub struct MultisigWalletConfig(config::MultisigWalletConfig);
+
+#[wasm_bindgen]
+impl MultisigWalletConfig {
+    pub fn from_str(config: &str) -> Result<MultisigWalletConfig, JsError> {
+        let config = config::MultisigWalletConfig::from_str(config)?;
+        Ok(MultisigWalletConfig(config))
+    }
+
+    pub fn to_string(&self) -> String {
+        self.0.to_string()
+    }
+
+    pub fn to_string_pretty(&self) -> String {
+        self.0.to_string_pretty()
+    }
+
+    pub fn external_descriptor(&self) -> Result<ExtendedDescriptor, JsError> {
+        let descriptor = self.0.descriptor(External)?;
+        Ok(ExtendedDescriptor(descriptor))
+    }
+
+    pub fn external_address(&self, index: u32) -> Result<String, JsError> {
+        let network = self.network();
+        let external_descriptor = self.external_descriptor()?;
+        Ok(external_descriptor.get_address(index, network)?)
+    }
+
+    pub fn internal_descriptor(&self) -> Result<ExtendedDescriptor, JsError> {
+        let descriptor = self.0.descriptor(Internal)?;
+        Ok(ExtendedDescriptor(descriptor))
+    }
+
+    pub fn internal_address(&self, index: u32) -> Result<String, JsError> {
+        let network = self.network();
+        let internal_descriptor = self.internal_descriptor()?;
+        Ok(internal_descriptor.get_address(index, network)?)
+    }
+
+    pub fn network(&self) -> Network {
+        Network(self.0.network())
+    }
+}
+
+#[derive(Debug)]
+#[wasm_bindgen]
 pub struct CaravanConfig(config::CaravanConfig);
 
 #[wasm_bindgen]
