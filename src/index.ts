@@ -1,8 +1,14 @@
-import * as caravan from "../caravan-rs/pkg"
-import { MultisigAddressType } from "unchained-bitcoin";
+import {} from "caravan-rs/pkg/caravan_rs";
+import {
+  CaravanConfig,
+  ExtendedDescriptor,
+  Network,
+  MultisigWalletConfig as RsWalletConfig,
+} from "../caravan-rs/pkg";
+import { BitcoinNetwork, MultisigAddressType } from "unchained-bitcoin";
 
 // TODO: should come from unchained-wallets
-export interface KeyDerivation {
+export interface KeyOrigin {
   xfp: string;
   bip32Path: string;
   xpub: string;
@@ -13,17 +19,28 @@ export type PolicyHmac = string;
 // should be an 8 byte hex string
 export type RootFingerprint = string;
 
-export interface DescriptorConfig {
+export interface MultisigWalletConfig {
   requiredSigners: number;
   addressType: MultisigAddressType;
-  extendedPublicKeys: KeyDerivation[];
+  keyOrigins: KeyOrigin[];
+  network: BitcoinNetwork;
 }
 
-export const decode_descriptor = (internal: string, external: string) => {
-  const external_descriptor = caravan.ExtendedDescriptor.from_str(external);
-  const internal_descriptor = caravan.ExtendedDescriptor.from_str(internal);
-  const config = caravan.CaravanConfig.new(
-    caravan.Network.from_str("bitcoin"),
+export const decode_descriptors = (
+  internal: string,
+  external: string,
+  network: BitcoinNetwork = "mainnet",
+): MultisigWalletConfig => {
+  const external_descriptor = ExtendedDescriptor.from_str(external);
+  const internal_descriptor = ExtendedDescriptor.from_str(internal);
+  let _network: BitcoinNetwork | "bitcoin";
+  if (network === "mainnet") {
+    _network = "bitcoin";
+  } else {
+    _network = network;
+  }
+  const config = CaravanConfig.new(
+    Network.from_str(_network),
     external_descriptor,
     internal_descriptor,
     "test1",
@@ -31,9 +48,8 @@ export const decode_descriptor = (internal: string, external: string) => {
   );
   const configObj = JSON.parse(config.to_string_pretty());
   const requiredSigners = configObj.quorum.requiredSigners;
-
-  const extendedPublicKeys = configObj.extendedPublicKeys.map(
-    ({ bip32Path, xpub, xfp }: KeyDerivation): KeyDerivation => ({
+  const keyOrigins = configObj.extendedPublicKeys.map(
+    ({ bip32Path, xpub, xfp }: KeyOrigin): KeyOrigin => ({
       bip32Path,
       xpub,
       xfp,
@@ -41,11 +57,20 @@ export const decode_descriptor = (internal: string, external: string) => {
   );
 
   return {
-    addressType: config.address_type(),
+    addressType: config.address_type() as MultisigAddressType,
     requiredSigners,
-    extendedPublicKeys,
+    keyOrigins,
+    network: "mainnet",
   };
 };
 
-// TODO: support wallet policies somehow so we only need one descriptor
-// TODO: types for config, network, etc.
+export const encode_descriptors = (
+  config: MultisigWalletConfig,
+): { receive: string; change: string } => {
+  const wallet = RsWalletConfig.from_str(JSON.stringify(config));
+
+  return {
+    receive: wallet.external_descriptor().to_string(),
+    change: wallet.internal_descriptor().to_string(),
+  };
+};
