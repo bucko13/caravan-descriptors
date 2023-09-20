@@ -1,10 +1,9 @@
 import {
   KeyOrigin,
   MultisigWalletConfig,
-  decode_descriptors,
-  encode_descriptors,
+  decodeDescriptors,
+  encodeDescriptors,
 } from "../src";
-import {} from "../src/index";
 
 const external =
   "sh(sortedmulti(2,[f57ec65d/45'/0'/100']xpub6CCHViYn5VzPfSR7baop9FtGcbm3UnqHwa54Z2eNvJnRFCJCdo9HtCYoLJKZCoATMLUowDDA1BMGfQGauY3fDYU3HyMzX4NDkoLYCSkLpbH/0/*,[efa5d916/45'/0'/100']xpub6Ca5CwTgRASgkXbXE5TeddTP9mPCbYHreCpmGt9dhz9y6femstHGCoFESHHKKRcm414xMKnuLjP9LDS7TwaJC9n5gxua6XB1rwPcC6hqDub/0/*))#uxj9xxul";
@@ -24,9 +23,9 @@ const expectedKeys = [
   },
 ];
 
-describe("decode_descriptors", () => {
-  it("works", () => {
-    const config = decode_descriptors(internal, external);
+describe("decodeDescriptors", () => {
+  it("works", async () => {
+    const config = await decodeDescriptors(internal, external);
     expect(config.addressType).toEqual("P2SH");
     expect(config.requiredSigners).toEqual(2);
     const derivation1: KeyOrigin = config.keyOrigins[0];
@@ -36,16 +35,15 @@ describe("decode_descriptors", () => {
   });
 });
 
-describe("encode_descriptors", () => {
-  it("should convert a config to descriptors", () => {
+describe("encodeDescriptors", () => {
+  it("should convert a config to descriptors", async () => {
     const config = {
       addressType: "P2SH",
       keyOrigins: expectedKeys,
       requiredSigners: 2,
       network: "mainnet",
     } as MultisigWalletConfig;
-
-    const actual = encode_descriptors(config);
+    const actual = await encodeDescriptors(config);
     expect(actual.receive).toEqual(external);
     expect(actual.change).toEqual(internal);
   });

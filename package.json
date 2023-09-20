@@ -2,16 +2,24 @@
   "name": "caravan-descriptors",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watchAll",
-    "build": "tsc"
+    "build:rs": "cd caravan-rs && wasm-pack build -t web --out-dir pkg-web && wasm-pack build -t nodejs --out-dir pkg-nodejs",
+    "build:ts": "tsc",
+    "build": "npm run clean && npm run build:rs && npm run build:ts",
+    "clean": "rm -rf dist/",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [],
   "author": "Buck Perley",
   "license": "ISC",
   "type": "module",
+  "files": [
+    "dist/"
+  ],
   "devDependencies": {
     "@jest/globals": "^29.7.0",
     "@jest/transform": "^29.7.0",

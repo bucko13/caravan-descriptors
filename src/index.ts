@@ -1,10 +1,4 @@
-import {} from "caravan-rs/pkg/caravan_rs";
-import {
-  CaravanConfig,
-  ExtendedDescriptor,
-  Network,
-  MultisigWalletConfig as RsWalletConfig,
-} from "../caravan-rs/pkg";
+import bdkPromise from "./wasmLoader";
 import { BitcoinNetwork, MultisigAddressType } from "unchained-bitcoin";
 
 // TODO: should come from unchained-wallets
@@ -26,11 +20,12 @@ export interface MultisigWalletConfig {
   network: BitcoinNetwork;
 }
 
-export const decode_descriptors = (
+export const decodeDescriptors = async (
   internal: string,
   external: string,
   network: BitcoinNetwork = "mainnet",
-): MultisigWalletConfig => {
+): Promise<MultisigWalletConfig> => {
+  const { ExtendedDescriptor, CaravanConfig, Network } = await bdkPromise;
   const external_descriptor = ExtendedDescriptor.from_str(external);
   const internal_descriptor = ExtendedDescriptor.from_str(internal);
   let _network: BitcoinNetwork | "bitcoin";
@@ -64,9 +59,11 @@ export const decode_descriptors = (
   };
 };
 
-export const encode_descriptors = (
+export const encodeDescriptors = async (
   config: MultisigWalletConfig,
-): { receive: string; change: string } => {
+): Promise<{ receive: string; change: string }> => {
+  const bdk = await bdkPromise;
+  const { MultisigWalletConfig: RsWalletConfig } = bdk;
   const wallet = RsWalletConfig.from_str(JSON.stringify(config));
 
   return {
