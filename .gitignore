@@ -4,3 +4,4 @@ node_modules
 .rustup
 .cargo
 dist/*
+.vscode

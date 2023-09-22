@@ -23,6 +23,22 @@ impl Network {
     }
 }
 
+#[wasm_bindgen(start)]
+pub fn init() {
+    // initialization code
+}
+
+
+// #[wasm_bindgen]
+// extern "C" {
+//     fn alert(s: &str);
+// }
+
+// #[wasm_bindgen]
+// pub fn init() {
+//     alert("Initialized from Rust!");
+// }
+
 #[derive(Debug)]
 #[wasm_bindgen]
 pub struct ExtendedDescriptor(BdkExtendedDescriptor);

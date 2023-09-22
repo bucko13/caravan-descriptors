@@ -1,4 +1,4 @@
-import bdkPromise from "./wasmLoader";
+import { getRustAPI } from "./wasmLoader";
 import { BitcoinNetwork, MultisigAddressType } from "unchained-bitcoin";
 
 // TODO: should come from unchained-wallets
@@ -25,7 +25,7 @@ export const decodeDescriptors = async (
   external: string,
   network: BitcoinNetwork = "mainnet",
 ): Promise<MultisigWalletConfig> => {
-  const { ExtendedDescriptor, CaravanConfig, Network } = await bdkPromise;
+  const { ExtendedDescriptor, CaravanConfig, Network } = await getRustAPI();
   const external_descriptor = ExtendedDescriptor.from_str(external);
   const internal_descriptor = ExtendedDescriptor.from_str(internal);
   let _network: BitcoinNetwork | "bitcoin";
@@ -62,7 +62,7 @@ export const decodeDescriptors = async (
 export const encodeDescriptors = async (
   config: MultisigWalletConfig,
 ): Promise<{ receive: string; change: string }> => {
-  const bdk = await bdkPromise;
+  const bdk = await getRustAPI();
   const { MultisigWalletConfig: RsWalletConfig } = bdk;
   const wallet = RsWalletConfig.from_str(JSON.stringify(config));
 
@@ -71,3 +71,5 @@ export const encodeDescriptors = async (
     change: wallet.internal_descriptor().to_string(),
   };
 };
+
+export default { encodeDescriptors, decodeDescriptors };
