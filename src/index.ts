@@ -28,13 +28,13 @@ export interface MultisigWalletConfig {
 export const decodeDescriptors = async (
   internal: string,
   external: string,
-  network: BitcoinNetwork = "mainnet",
+  network?: BitcoinNetwork,
 ): Promise<MultisigWalletConfig> => {
   const { ExtendedDescriptor, CaravanConfig, Network } = await getRustAPI();
   const external_descriptor = ExtendedDescriptor.from_str(external);
   const internal_descriptor = ExtendedDescriptor.from_str(internal);
   let _network: BitcoinNetwork | "bitcoin";
-  if (network === "mainnet") {
+  if (network === "mainnet" || !network) {
     _network = "bitcoin";
   } else {
     _network = network;
@@ -50,11 +50,13 @@ export const decodeDescriptors = async (
   const requiredSigners = configObj.quorum.requiredSigners;
   const keyOrigins = configObj.extendedPublicKeys.map(
     ({ bip32Path, xpub, xfp }: KeyOrigin): KeyOrigin => {
-      const error = validateExtendedPublicKeyForNetwork(xpub, network);
-      if (error) {
-        throw new Error(
-          `xpubs do not match expected network ${network}: ${error}`,
-        );
+      if (network) {
+        const error = validateExtendedPublicKeyForNetwork(xpub, network);
+        if (error) {
+          throw new Error(
+            `xpubs do not match expected network ${network}: ${error}`,
+          );
+        }
       }
       return {
         bip32Path,
@@ -68,7 +70,7 @@ export const decodeDescriptors = async (
     addressType: config.address_type() as MultisigAddressType,
     requiredSigners,
     keyOrigins,
-    network: network,
+    network: _network,
   };
 };
 
@@ -86,6 +88,26 @@ export const encodeDescriptors = async (
 };
 
 const checksumRegex = /#[0-9a-zA-Z]{8}/g;
+
+export const getChecksum = async (descriptor: string) => {
+  // let's just check that the descriptor is valid
+  try {
+    await getWalletFromDescriptor(descriptor);
+  } catch (e) {
+    if (e instanceof Error) {
+      throw new Error(`Invalid descriptor: ${e.message}`);
+    } else {
+      throw e;
+    }
+  }
+  const checksum = descriptor.match(checksumRegex);
+  const pieces = descriptor.split("#");
+  if (!checksum || pieces.length !== 2) {
+    throw new Error("Could not find valid checksum");
+  }
+  return pieces[1];
+};
+
 export const getWalletFromDescriptor = async (
   descriptor: string,
   network?: BitcoinNetwork,

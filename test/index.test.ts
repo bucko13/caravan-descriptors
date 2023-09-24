@@ -3,6 +3,7 @@ import {
   MultisigWalletConfig,
   decodeDescriptors,
   encodeDescriptors,
+  getChecksum,
   getWalletFromDescriptor,
 } from "../src";
 
@@ -103,5 +104,34 @@ describe("getWalletFromDescriptor", () => {
       }
     }
     expect(passed).toBeTruthy();
+  });
+});
+
+describe("getChecksum", () => {
+  it("should return correct checksum", async () => {
+    const internalChecksum = await getChecksum(internal);
+    expect(internalChecksum).toEqual("3hxf9z66");
+    const externalChecksum = await getChecksum(external);
+    expect(externalChecksum).toEqual("uxj9xxul");
+  });
+
+  it("should throw if invalid or missing checksum", async () => {
+    let passed = false;
+    const invalids = [
+      internal.split("#")[0],
+      internal.concat("asdf"),
+      internal.split("#")[0].concat("#123"),
+      internal.split("#")[0].concat("#1234abcd"),
+    ];
+    for (const test of invalids) {
+      try {
+        await getChecksum(test);
+      } catch (e: any) {
+        if (e instanceof Error) {
+          passed = true;
+        }
+      }
+      expect(passed).toBeTruthy();
+    }
   });
 });
