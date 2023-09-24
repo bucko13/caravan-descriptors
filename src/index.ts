@@ -1,5 +1,10 @@
 import { getRustAPI } from "./wasmLoader";
-import { BitcoinNetwork, MultisigAddressType } from "unchained-bitcoin";
+import {
+  BitcoinNetwork,
+  ExtendedPublicKey,
+  MultisigAddressType,
+  validateExtendedPublicKeyForNetwork,
+} from "unchained-bitcoin";
 
 // TODO: should come from unchained-wallets
 export interface KeyOrigin {
@@ -17,7 +22,7 @@ export interface MultisigWalletConfig {
   requiredSigners: number;
   addressType: MultisigAddressType;
   keyOrigins: KeyOrigin[];
-  network: BitcoinNetwork;
+  network: BitcoinNetwork | "bitcoin";
 }
 
 export const decodeDescriptors = async (
@@ -44,18 +49,26 @@ export const decodeDescriptors = async (
   const configObj = JSON.parse(config.to_string_pretty());
   const requiredSigners = configObj.quorum.requiredSigners;
   const keyOrigins = configObj.extendedPublicKeys.map(
-    ({ bip32Path, xpub, xfp }: KeyOrigin): KeyOrigin => ({
-      bip32Path,
-      xpub,
-      xfp,
-    }),
+    ({ bip32Path, xpub, xfp }: KeyOrigin): KeyOrigin => {
+      const error = validateExtendedPublicKeyForNetwork(xpub, network);
+      if (error) {
+        throw new Error(
+          `xpubs do not match expected network ${network}: ${error}`,
+        );
+      }
+      return {
+        bip32Path,
+        xpub,
+        xfp,
+      };
+    },
   );
 
   return {
     addressType: config.address_type() as MultisigAddressType,
     requiredSigners,
     keyOrigins,
-    network: "mainnet",
+    network: network,
   };
 };
 
@@ -70,6 +83,24 @@ export const encodeDescriptors = async (
     receive: wallet.external_descriptor().to_string(),
     change: wallet.internal_descriptor().to_string(),
   };
+};
+
+const checksumRegex = /#[0-9a-zA-Z]{8}/g;
+export const getWalletFromDescriptor = async (
+  descriptor: string,
+  network?: BitcoinNetwork,
+): Promise<MultisigWalletConfig> => {
+  let internal: string = "",
+    external: string = "";
+  if (descriptor.includes("0/*")) {
+    external = descriptor;
+    internal = descriptor.replace(/0\/\*/g, "1/*").replace(checksumRegex, "");
+  } else if (descriptor.includes("1/*")) {
+    internal = descriptor;
+    external = descriptor.replace(/1\/\*/g, "0/*").replace(checksumRegex, "");
+  }
+  console.log("network: ", network);
+  return await decodeDescriptors(internal, external, network);
 };
 
 export default { encodeDescriptors, decodeDescriptors };
